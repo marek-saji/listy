@@ -1,0 +1,24 @@
+{
+  "name": "listy",
+  "version": "1.0.0",
+  "description": "Put things on lists.",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marek-saji/listy.git"
+  },
+  "keywords": [
+    "list",
+    "organise",
+    "todo"
+  ],
+  "author": "Marek ‘saji’ Augustynowicz <marek.aug@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/marek-saji/listy/issues"
+  },
+  "homepage": "https://github.com/marek-saji/listy#readme"
+}
