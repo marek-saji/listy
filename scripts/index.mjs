@@ -1,57 +1,37 @@
 /**
- * @param {HTMLElement} node
- * @returns {[number, number]}
+ * @param {HTMLUListElement} list
  */
-function getSelectionOffsets (node)
+function cleanUpList (list)
 {
-    const selection = node.ownerDocument.getSelection();
-    const range = selection.getRangeAt(0);
-    return [range.startOffset, range.endOffset];
+    Array.from(list.children).forEach((item) => {
+        if (item.tagName === 'LI')
+        {
+            if (Array.from(item.childNodes).some(node => node.nodeType !== Node.TEXT_NODE))
+            {
+                item.textContent = item.textContent;
+                item.removeAttribute('style');
+                // TODO Clean up other stuff?
+            }
+        }
+        else if (item.tagName === 'UL')
+        {
+            cleanUpList(item);
+        }
+    });
 }
 
 /**
- * @param {HTMLElement} node
- * @returns {boolean}
+ * @param {MouseEvent} event
  */
-function hasSelection (node)
+function handleAddButtonClick ()
 {
-    const [start, end] = getSelectionOffsets(node);
-    return start !== end;
-}
-
-/**
- * @param {HTMLElement} node
- * @returns {number}
- */
-function getCursorPosition (node)
-{
-    const [start, end] = getSelectionOffsets(node);
-    if (start !== end)
-    {
-        return undefined;
-    }
-    return start;
-}
-
-/**
- * @param {HTMLElement} node
- * @param {number} position
- * @returns {void}
- */
-function setCursorPosition (node, position)
-{
-    let textNode = node
-    if (textNode.nodeType !== Node.TEXT_NODE)
-    {
-        // TODO Handle other cases
-        textNode = textNode.childNodes[0] || textNode;
-    }
-
-    const selection = node.ownerDocument.getSelection();
-    const range = node.ownerDocument.createRange();
-    const newPosition = Math.min(position, textNode.textContent.length);
-    range.setStart(textNode, newPosition)
-    range.setEnd(textNode, newPosition);
+    const list = document.querySelector('ul')
+    const newItem = list.ownerDocument.createElement('li');
+    list.append(newItem);
+    const selection = list.ownerDocument.getSelection();
+    const range = list.ownerDocument.createRange();
+    range.setStart(newItem, 0);
+    range.setEnd(newItem, 0);
     selection.removeAllRanges();
     selection.addRange(range);
 }
@@ -59,136 +39,75 @@ function setCursorPosition (node, position)
 /**
  * @param {KeyboardEvent} event
  */
-function handleItemKeyPress (event)
+function handleListKeydown (event)
 {
-    /** @type {HTMLLIElement} */
-    const item = event.target;
-    if (item.tagName === 'LI')
+    /** @type {HTMLUListElement} */
+    const list = event.target;
+    cleanUpList(list);
+}
+
+/**
+ * @param {KeyboardEvent} event
+ */
+function handleListKeyup (event)
+{
+    /** @type {HTMLUListElement} */
+    const list = event.target;
+
+    const keyCombo = [
+        event.ctrlKey && 'Ctrl',
+        event.shiftKey && 'Shift',
+        event.altKey && 'Alt',
+        event.metaKey && 'Meta',
+        event.key,
+    ].filter(Boolean).join('+');
+    console.debug('KEY', keyCombo);
+
+    switch (keyCombo)
     {
-        const keyCombo = [
-            event.shiftKey && 'Shift',
-            event.ctrlKey && 'Ctrl',
-            event.altKey && 'Alt',
-            event.metaKey && 'Meta',
-            event.key
-        ].filter(Boolean).join('+');
-        console.debug('KEY:', keyCombo);
-
-        switch (keyCombo)
+        case 'Ctrl+Enter':
+        case 'Shift+Enter':
+        case 'Meta+Enter':
         {
-            case 'ArrowUp': {
-                const oldPosition = getCursorPosition(item);
-                if (oldPosition != null && item.previousElementSibling)
-                {
-                    event.preventDefault();
-                    const newItem = item.previousElementSibling;
-                    setCursorPosition(newItem, oldPosition);
-                }
-                break;
+            event.preventDefault();
+            const selection = list.ownerDocument.getSelection();
+            const focusNode = selection.focusNode;
+            const item = focusNode.nodeType === Node.ELEMENT_NODE ? focusNode : focusNode.parentElement;
+            // TODO Is it possible to do this in a way so it’s included in undo history?
+            item.dataset.completed = item.dataset.completed !== 'true';
+            const nextItem = item.nextElementSibling;
+            if (nextItem)
+            {
+                const range = list.ownerDocument.createRange();
+                range.setStart(nextItem, 0);
+                range.setEnd(nextItem, 0);
+                selection.removeAllRanges();
+                selection.addRange(range);
             }
-            case 'ArrowDown': {
-                const oldPosition = getCursorPosition(item);
-                if (oldPosition != null && item.nextElementSibling)
-                {
-                    event.preventDefault();
-                    const newItem = item.nextElementSibling;
-                    // FIXME Moving to the same position is not right.
-                    //       We could get away if we used monospace
-                    //       font, but with vaiable width it’s all over
-                    //       the place. Ideal solution would be to
-                    //       enable contentEditable on the parent, which
-                    //       would also give us Ctrl+Z and Ctrl+Y, but
-                    //       it comes with it’s own problems.
-                    setCursorPosition(newItem, oldPosition);
-                }
-                break;
-            }
-            case 'ArrowRight': {
-                const position = getCursorPosition(item);
-                if (position === item.textContent.length)
-                {
-                    event.preventDefault();
-                    item.nextElementSibling?.focus();
-                }
-                break;
-            }
-            case 'ArrowLeft': {
-                const position = getCursorPosition(item);
-                if (position === 0)
-                {
-                    event.preventDefault();
-                    const newItem = item.previousElementSibling;
-                    if (newItem)
-                    {
-                        setCursorPosition(newItem, newItem.textContent.length);
-                    }
-                }
-                break;
-            }
-            case 'Ctrl+Enter':
-            case 'Meta+Enter':
-            case 'Shift+Enter': {
-                event.preventDefault();
-                item.classList.toggle('completed');
-                item.nextElementSibling?.focus();
-                break;
-            }
-            case 'Enter': {
-                event.preventDefault();
-                const newItem = item.ownerDocument.createElement('li');
-                newItem.contentEditable = true;
-
-                const position = getCursorPosition(item);
-                const content = item.textContent;
-                item.textContent = content.slice(0, position);
-                newItem.textContent = content.slice(position);
-
-                item.after(newItem);
-                newItem.focus();
-                break;
-            }
-            case 'Backspace': {
-                if (item.previousElementSibling && !hasSelection(item))
-                {
-                    const position = getCursorPosition(item);
-                    if (position === 0)
-                    {
-                        event.preventDefault();
-                        const newItem = item.previousElementSibling;
-                        const oldPosition = newItem.textContent.length;
-                        newItem.textContent += item.textContent;
-                        item.remove();
-                        setCursorPosition(newItem, oldPosition);
-                    }
-                }
-                break;
-            }
-            case 'Delete': {
-                if (item.nextElementSibling && !hasSelection(item))
-                {
-                    const position = getCursorPosition(item);
-                    if (position === item.textContent.length)
-                    {
-                        event.preventDefault();
-                        const oldItem = item.nextElementSibling;
-                        item.textContent += oldItem.textContent;
-                        oldItem.remove();
-                        setCursorPosition(item, position);
-                    }
-                }
-                break;
-            }
+            break;
+        }
+        case 'Tab':
+        {
+            event.preventDefault();
+            // TODO Check if it makese sense
+            list.ownerDocument.execCommand('indent');
+            break;
+        }
+        case 'Shift+Tab':
+        {
+            event.preventDefault();
+            // TODO Check if it makese sense
+            list.ownerDocument.execCommand('unindent');
+            break;
+        }
+        case 'Ctrl+a':
+        case 'Meta+a':
+        {
+            // TODO Select only current item
         }
     }
 }
 
-function handleAddButtonClick ()
-{
-    const newItem = document.createElement('li');
-    newItem.contentEditable = true;
-    document.querySelector('ul').append(newItem);
-    newItem.focus();
-}
-
-document.querySelector('main').addEventListener('keydown', handleItemKeyPress);
 document.querySelector('button').addEventListener('click', handleAddButtonClick);
+document.querySelector('ul').addEventListener('keydown', handleListKeyup);
+document.querySelector('ul').addEventListener('keyup', handleListKeydown);
