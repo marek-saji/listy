@@ -4,6 +4,7 @@
   "description": "Put things on lists.",
   "main": "index.html",
   "scripts": {
+    "dev": "npx @11ty/eleventy-dev-server",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

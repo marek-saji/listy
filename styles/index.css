@@ -1,0 +1,28 @@
+:root,
+::backdrop
+{
+    color-scheme: light dark;
+    font-family: system-ui, -apple-system, Open Sans, Helvetica Neue, sans-serif;
+    font-size: 1.2em;
+}
+
+li
+{
+    transition: opacity 100ms ease-in-out;
+}
+
+li:focus-visible
+{
+    outline: none;
+}
+
+li:not(:focus-visible)
+{
+    opacity: 0.8;
+}
+
+li.completed
+{
+    text-decoration: line-through;
+    opacity: 0.5;
+}
