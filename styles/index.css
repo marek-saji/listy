@@ -11,7 +11,7 @@ li
     transition: opacity 100ms ease-in-out;
 }
 
-ul:focus-visible
+li:focus-visible
 {
     outline: none;
 }
@@ -21,7 +21,7 @@ li:not(:focus-visible)
     opacity: 0.8;
 }
 
-li[data-completed="true"]
+li.completed
 {
     text-decoration: line-through;
     opacity: 0.5;
