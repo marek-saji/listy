@@ -191,11 +191,20 @@ function handleItemKeyDown (event)
 
                 const position = getCursorPosition(item);
                 const content = item.textContent;
-                item.textContent = content.slice(0, position);
-                newItem.textContent = content.slice(position);
 
-                item.after(newItem);
-                newItem.focus();
+                if (position === 0)
+                {
+                    newItem.textContent = content.slice(0, position);
+                    item.textContent = content.slice(position);
+                    item.before(newItem);
+                }
+                else
+                {
+                    item.textContent = content.slice(0, position);
+                    newItem.textContent = content.slice(position);
+                    item.after(newItem);
+                    newItem.focus();
+                }
                 break;
             }
 
@@ -206,11 +215,18 @@ function handleItemKeyDown (event)
                     if (position === 0)
                     {
                         event.preventDefault();
-                        const newItem = item.previousElementSibling;
-                        const oldPosition = newItem.textContent.length;
-                        newItem.textContent += item.textContent;
-                        item.remove();
-                        setCursorPosition(newItem, oldPosition);
+                        if (item.previousElementSibling.textContent === '')
+                        {
+                            item.previousElementSibling.remove();
+                        }
+                        else
+                        {
+                            const newItem = item.previousElementSibling;
+                            const oldPosition = newItem.textContent.length;
+                            newItem.textContent += item.textContent;
+                            item.remove();
+                            setCursorPosition(newItem, oldPosition);
+                        }
                     }
                 }
                 break;
