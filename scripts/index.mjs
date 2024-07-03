@@ -43,7 +43,7 @@ function setCursorPosition (node, position)
     let textNode = node
     if (textNode.nodeType !== Node.TEXT_NODE)
     {
-        // TODO Handle other cases
+        // TODO Better handle setting position in nodes with more than just one text node
         textNode = textNode.childNodes[0] || textNode;
     }
 
@@ -57,52 +57,87 @@ function setCursorPosition (node, position)
 }
 
 /**
+ * @param {HTMLElement} node
+ * @returns {void}
+ */
+function selectAll (node)
+{
+    let textNode = node
+    if (textNode.nodeType !== Node.TEXT_NODE)
+    {
+        // TODO Better handle getting position from nodes with more than just one text node
+        textNode = textNode.childNodes[0] || textNode;
+    }
+
+    const selection = node.ownerDocument.getSelection();
+    const range = node.ownerDocument.createRange();
+    range.setStart(textNode, 0)
+    range.setEnd(textNode, textNode.textContent.length);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+/**
+ * @param {KeyboardEvent} event
+ * @returns {string}
+ */
+function getKeyboardEventKeyCombo (event)
+{
+    return [
+        event.ctrlKey && 'Ctrl',
+        event.altKey && 'Alt',
+        event.shiftKey && 'Shift',
+        event.metaKey && 'Meta',
+        event.key
+    ].filter(Boolean).join('+');
+}
+
+/**
  * @param {KeyboardEvent} event
  */
-function handleItemKeyPress (event)
+function handleItemKeyDown (event)
 {
     /** @type {HTMLLIElement} */
     const item = event.target;
     if (item.tagName === 'LI')
     {
-        const keyCombo = [
-            event.shiftKey && 'Shift',
-            event.ctrlKey && 'Ctrl',
-            event.altKey && 'Alt',
-            event.metaKey && 'Meta',
-            event.key
-        ].filter(Boolean).join('+');
+        const keyCombo = getKeyboardEventKeyCombo(event);
         console.debug('KEY:', keyCombo);
 
         switch (keyCombo)
         {
             case 'ArrowUp': {
                 const oldPosition = getCursorPosition(item);
+                // FIXME Don’t do anything, if cursor is not in the first line of a multi–line item.
                 if (oldPosition != null && item.previousElementSibling)
                 {
                     event.preventDefault();
                     const newItem = item.previousElementSibling;
+                    // FIXME Moving to the same text offset when switching between items is not great UX.
+                    //       We could get away if we used monospace
+                    //       font, but with vaiable width it’s all over
+                    //       the place.
                     setCursorPosition(newItem, oldPosition);
                 }
                 break;
             }
+
             case 'ArrowDown': {
                 const oldPosition = getCursorPosition(item);
+                // FIXME Don’t do anything, if cursor is not in the last line of a multi–line item.
                 if (oldPosition != null && item.nextElementSibling)
                 {
                     event.preventDefault();
                     const newItem = item.nextElementSibling;
-                    // FIXME Moving to the same position is not right.
+                    // FIXME Moving to the same text offset when switching between items is not great UX.
                     //       We could get away if we used monospace
                     //       font, but with vaiable width it’s all over
-                    //       the place. Ideal solution would be to
-                    //       enable contentEditable on the parent, which
-                    //       would also give us Ctrl+Z and Ctrl+Y, but
-                    //       it comes with it’s own problems.
+                    //       the place.
                     setCursorPosition(newItem, oldPosition);
                 }
                 break;
             }
+
             case 'ArrowRight': {
                 const position = getCursorPosition(item);
                 if (position === item.textContent.length)
@@ -112,6 +147,7 @@ function handleItemKeyPress (event)
                 }
                 break;
             }
+
             case 'ArrowLeft': {
                 const position = getCursorPosition(item);
                 if (position === 0)
@@ -125,14 +161,29 @@ function handleItemKeyPress (event)
                 }
                 break;
             }
+
             case 'Ctrl+Enter':
             case 'Meta+Enter':
             case 'Shift+Enter': {
                 event.preventDefault();
+
+                const position = getCursorPosition(item);
+                selectAll(item);
+                document.execCommand('strikeThrough');
+                item.innerHTML = item.textContent;
+                setCursorPosition(item, position);
+
                 item.classList.toggle('completed');
-                item.nextElementSibling?.focus();
+                if (item.classList.contains('completed'))
+                {
+                    if (item.nextElementSibling)
+                    {
+                        item.nextElementSibling.focus();
+                    }
+                }
                 break;
             }
+
             case 'Enter': {
                 event.preventDefault();
                 const newItem = item.ownerDocument.createElement('li');
@@ -147,6 +198,7 @@ function handleItemKeyPress (event)
                 newItem.focus();
                 break;
             }
+
             case 'Backspace': {
                 if (item.previousElementSibling && !hasSelection(item))
                 {
@@ -163,6 +215,7 @@ function handleItemKeyPress (event)
                 }
                 break;
             }
+
             case 'Delete': {
                 if (item.nextElementSibling && !hasSelection(item))
                 {
@@ -179,6 +232,64 @@ function handleItemKeyPress (event)
                 break;
             }
         }
+
+        // Ensure no formatting went through by pasting or using keyboard shortcuts
+        // TODO Throttle
+        requestAnimationFrame(() => {
+            if (item.innerHTML !== item.textContent)
+            {
+                item.innerHTML = item.textContent;
+            }
+        });
+    }
+}
+
+/**
+ * @param {KeyboardEvent} event
+ */
+function handleItemKeyUp (event)
+{
+    /** @type {HTMLLIElement} */
+    const item = event.target;
+    if (item.tagName === 'LI')
+    {
+        const keyCombo = getKeyboardEventKeyCombo(event);
+        console.debug('KEY:', keyCombo);
+
+        let undoHistoryChange = false;
+
+        switch (keyCombo)
+        {
+            // QUIRK
+            // Would be nice to handle these in handleItemKeyDown with
+            // the rest, but WebKit doesn’t send Undo/Redo keyboard
+            // events in keydown (but does in keyup).
+            case 'Ctrl+z':
+            case 'Meta+z':
+            case 'Ctrl+Shift+z':
+            case 'Meta+Shift+z': {
+                undoHistoryChange = true;
+                break;
+            }
+        }
+
+        if (undoHistoryChange)
+        {
+            // QUIRK
+            // Because of formatting cleanup after an Undo or Redo, we
+            // can end up with two text nodes (with equal content) in
+            // the same item.
+            // TODO Throttle
+            requestAnimationFrame(() => {
+                if (
+                    item.childNodes.length === 2
+                    && item.childNodes[0].textContent === item.childNodes[1].textContent
+                )
+                {
+                    item.childNodes[1].remove();
+                }
+            });
+        }
     }
 }
 
@@ -190,5 +301,6 @@ function handleAddButtonClick ()
     newItem.focus();
 }
 
-document.querySelector('main').addEventListener('keydown', handleItemKeyPress);
+document.querySelector('main').addEventListener('keydown', handleItemKeyDown);
+document.querySelector('main').addEventListener('keyup', handleItemKeyUp);
 document.querySelector('button').addEventListener('click', handleAddButtonClick);
