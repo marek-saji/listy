@@ -78,6 +78,28 @@ function selectAll (node)
 }
 
 /**
+ * @param {HTMLElement} node
+ * @param {number} position
+ */
+function getLineInfo (node, cursorPosition)
+{
+    const position = (cursorPosition === undefined) ? getCursorPosition(node) : cursorPosition;
+
+    const heightTester = document.getElementById('height-tester');
+    heightTester.textContent = 'A';
+    const oneLineHeight = heightTester.offsetHeight;
+    const allLinesHeight = node.offsetHeight;
+    heightTester.textContent = node.textContent.substring(0, position);
+    const height = heightTester.offsetHeight;
+
+    return {
+        isAtFirstLine: height === oneLineHeight,
+        isAtLastLine: height === allLinesHeight,
+        isMultiLine: allLinesHeight > oneLineHeight,
+    }
+}
+
+/**
  * @param {KeyboardEvent} event
  * @returns {string}
  */
@@ -108,8 +130,9 @@ function handleItemKeyDown (event)
         {
             case 'ArrowUp': {
                 const oldPosition = getCursorPosition(item);
+                const { isAtFirstLine } = getLineInfo(item, oldPosition + 1);
                 // FIXME Don’t do anything, if cursor is not in the first line of a multi–line item.
-                if (oldPosition != null && item.previousElementSibling)
+                if (oldPosition != null && item.previousElementSibling && isAtFirstLine)
                 {
                     event.preventDefault();
                     const newItem = item.previousElementSibling;
@@ -117,6 +140,7 @@ function handleItemKeyDown (event)
                     //       We could get away if we used monospace
                     //       font, but with vaiable width it’s all over
                     //       the place.
+                    // FIXME When moving from a multi–line element, should use position in the line
                     setCursorPosition(newItem, oldPosition);
                 }
                 break;
@@ -124,8 +148,9 @@ function handleItemKeyDown (event)
 
             case 'ArrowDown': {
                 const oldPosition = getCursorPosition(item);
+                const { isAtLastLine, isMultiLine } = getLineInfo(item, oldPosition + 1);
                 // FIXME Don’t do anything, if cursor is not in the last line of a multi–line item.
-                if (oldPosition != null && item.nextElementSibling)
+                if (oldPosition != null && item.nextElementSibling && isAtLastLine)
                 {
                     event.preventDefault();
                     const newItem = item.nextElementSibling;
@@ -133,7 +158,15 @@ function handleItemKeyDown (event)
                     //       We could get away if we used monospace
                     //       font, but with vaiable width it’s all over
                     //       the place.
-                    setCursorPosition(newItem, oldPosition);
+                    // FIXME When moving from a multi–line element, should use position in the line
+                    if (isMultiLine)
+                    {
+                        setCursorPosition(newItem, 0);
+                    }
+                    else
+                    {
+                        setCursorPosition(newItem, oldPosition);
+                    }
                 }
                 break;
             }

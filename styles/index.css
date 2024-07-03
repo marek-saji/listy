@@ -6,11 +6,19 @@
     font-size: 1.2em;
 }
 
+.height-tester-container
+{
+    margin: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 li
 {
     transition:
         opacity, color 150ms ease-in-out,
         text-decoration-color 100ms ease-in-out;
+    white-space: pre-wrap;
 }
 
 li:focus-visible
