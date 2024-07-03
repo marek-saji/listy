@@ -8,7 +8,9 @@
 
 li
 {
-    transition: opacity 100ms ease-in-out;
+    transition:
+        opacity, color 150ms ease-in-out,
+        text-decoration-color 100ms ease-in-out;
 }
 
 li:focus-visible
@@ -24,5 +26,15 @@ li:not(:focus-visible)
 li.completed
 {
     text-decoration: line-through;
-    opacity: 0.5;
+    text-decoration-color: #888;
+    text-decoration-color: light-dark(#333, #aaa);
+    color: #888;
+}
+
+@starting-style
+{
+    li.completed
+    {
+        text-decoration-color: transparent;
+    }
 }
